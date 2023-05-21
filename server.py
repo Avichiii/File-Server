@@ -140,15 +140,36 @@ class FileOperation(Server):
             clientSocket.send('File Operation Failed'.encode())
     
     def changeD(self, clientSocket:socket):
+        global PATH
         try:
             dirname = clientSocket.recv(MAX_SIZE).decode()
-            PATH = os.chdir(f'{PATH}\\{dirname}')
-            message = f'{dirname} changed Successfully.'
-            clientSocket.send(message.encode())
-            return self.fileOps(clientSocket)
-
+            print(dirname)
+            if dirname == 'pwd':
+                message = f'current path > {PATH}'
+                clientSocket.send(message.encode())
+                return self.fileOps(clientSocket)
+            
+            elif dirname == '..':
+                if PATH == r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\serverFiles':
+                    clientSocket.send('can\'t revert anymore.'.encode())
+                    return self.fileOps(clientSocket)
+                else:
+                    os.chdir('..')
+                    PATH = os.getcwd()
+                    message = f'{PATH} changed Successfully.'
+                    clientSocket.send(message.encode())
+                    return self.fileOps(clientSocket)
+                
+            else:
+                os.chdir(f'{PATH}\\{dirname}')
+                PATH = os.getcwd()
+                message = f'{PATH} changed Successfully.'
+                clientSocket.send(message.encode())
+                return self.fileOps(clientSocket)
+            
         except:
             clientSocket.send('File Operation Failed'.encode())
+            clientSocket.close()
     
     def getFile(self, clientSocket:socket):
         try:
