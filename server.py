@@ -150,7 +150,7 @@ class FileOperation(Server):
                 return self.fileOps(clientSocket)
             
             elif dirname == '..':
-                if PATH == r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\serverFiles':
+                if PATH == r'D:\file_server\serverFiles':
                     clientSocket.send('can\'t revert anymore.'.encode())
                     return self.fileOps(clientSocket)
                 else:
