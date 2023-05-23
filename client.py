@@ -1,7 +1,8 @@
 from socket import * #type: ignore
 import time
+import string
 
-PATH = r'F:\file_server\clientFiles'
+PATH = r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\clientFiles'
 MAX_SIZE = 1024 * 1024
 
 class Method:
@@ -17,14 +18,19 @@ class CreatingSocket:
 
     def request(self):
         try:
-            print('[+] command: List | Operation')
-            reqMethod = input('Method <: ').upper()
+            authResponse = self.checkAuth()
 
-            if reqMethod == Method.flist:
-                self.listFiledDir()
-            
-            elif reqMethod == Method.fileOperations:
-                self.callMainLoop(reqMethod)
+            if authResponse == True:
+                print('[+] command: List | Operation')
+                reqMethod = input('Method <: ').upper()
+
+                if reqMethod == Method.flist:
+                    self.listFiledDir()
+                
+                elif reqMethod == Method.fileOperations:
+                    self.callMainLoop(reqMethod)
+            else:
+                print('Auth Failure')
 
         except:
             print('File Operation Failed')
@@ -48,8 +54,40 @@ class FileOperations(CreatingSocket):
     
     def callMainLoop(self, reqMethod:str):
         time.sleep(0.1)
+       
         self.clientSocket.send(reqMethod.encode())
         self.mainLoop()
+
+    def checkAuth(self):
+        psw = input('Enter Password <: ')
+        passwd = self.rot(psw)
+        self.clientSocket.send(str(passwd).encode())
+        responseCode = self.clientSocket.recv(MAX_SIZE).decode()
+        if responseCode == 'True':
+            return True
+
+        elif responseCode == 'False':
+            return False
+        
+        else:
+            print('Exception occured! ')
+    
+    def rot(self, psw: str):
+        lenpass = len(psw)
+
+        newEncryptedPass = ''
+
+        for i in range(lenpass):
+            if psw[i] in string.ascii_lowercase:
+                index = string.ascii_lowercase.index(psw[i])
+                newEncryptedPass += string.ascii_lowercase[(index+13)%26]
+            elif psw[i] in string.ascii_uppercase:
+                index = string.ascii_uppercase.index(psw[i])
+                newEncryptedPass += string.ascii_uppercase[(index+13)%26]
+            else:
+                newEncryptedPass += i
+
+        return newEncryptedPass
 
     def mainLoop(self):
         while True:

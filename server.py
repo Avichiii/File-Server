@@ -1,9 +1,9 @@
 from socket import * #type: ignore
 import threading
 import os
+import auth
 
 MAX_SIZE = 1024 * 1024
-PATH = r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\serverFiles'
 
 class Method:
     flist = 'LIST_DIR'
@@ -25,6 +25,7 @@ class Server:
         self.serverSocket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # let imediately use the socket after it's closed
         self.serverSocket.bind((gethostbyname(gethostname()), self.serverPort))
         self.serverSocket.listen(100)
+        self.path = r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\serverFiles'
 
     def start(self):
         print('[+] Server is running...\n')
@@ -34,24 +35,43 @@ class Server:
             self.startFileServer(clientSocket, addr)
 
     def startFileServer(self, clientSocket:socket, addr):
-        getClinetRequest = clientSocket.recv(MAX_SIZE).decode()
-        getMethod = getClinetRequest.split(' ')[0]
-        print(getClinetRequest)
-        print(f'[+] IP: {addr[0]} Port: {addr[1]}  connected')
+        getAuthFromClient = clientSocket.recv(MAX_SIZE).decode()
+        getauth = authentication(getAuthFromClient)
+        clientSocket.send(str(getauth).encode())
+
+        if getauth == True:
+
+            getClinetRequest = clientSocket.recv(MAX_SIZE).decode()
+            getMethod = getClinetRequest.split(' ')[0]
+            print(getClinetRequest)
+            print(f'[+] IP: {addr[0]} Port: {addr[1]}  connected')
+                
+            if getMethod == Method.flist:
+                threading.Thread(target=listFileDir, args=(clientSocket,)).start()
             
-        if getMethod == Method.flist:
-            threading.Thread(target=listFileDir, args=(clientSocket,)).start()
+            elif getMethod == Method.fileOperations:
+                threading.Thread(target=self.fileOps, args=(clientSocket,)).start()
+                
+            else:
+                clientSocket.send('Please Enter Valid Method'.encode())
         
-        elif getMethod == Method.fileOperations:
-            threading.Thread(target=self.fileOps, args=( clientSocket,)).start()
-            
+        elif getauth == False:
+            # clientSocket.send('Incorrect Password'.encode())
+            print('Incorrect Password')
+            clientSocket.close()
+        
         else:
-            clientSocket.send('Please Enter Valid Method'.encode())
+            print('Server Error')
+            clientSocket.close()
+
+def authentication(passwd: str) -> bool:
+    responsebool = auth.rotReverse(passwd)
+    return responsebool
 
 
-def listFileDir(clientSocket:socket):
+def listFileDir(self, clientSocket:socket):
     try:
-        files = os.listdir(PATH)
+        files = os.listdir(self.path)
         clientSocket.send((str(len(files))).encode())
         for file in files:
             clientSocket.send(file.encode() + '\n'.encode())
@@ -95,7 +115,7 @@ class FileOperation(Server):
     def createF(self, clientSocket:socket):
         try:
             filename = clientSocket.recv(MAX_SIZE).decode()
-            with open(f'{PATH}\\{filename}.txt', 'a') as file:
+            with open(f'{self.path}\\{filename}.txt', 'a') as file:
                 fileContent = clientSocket.recv(MAX_SIZE).decode()
                 file.write(fileContent)
 
@@ -109,7 +129,7 @@ class FileOperation(Server):
     def deleteF(self, clientSocket:socket):
         try:
             filename = clientSocket.recv(MAX_SIZE).decode()
-            os.remove(f'{PATH}\\{filename}.txt')
+            os.remove(f'{self.path}\\{filename}.txt')
             message = f'{filename} deleted Successfully.'
             clientSocket.send(message.encode())
             return self.fileOps(clientSocket)
@@ -120,7 +140,7 @@ class FileOperation(Server):
     def createD(self, clientSocket:socket):
         try:
                 dirname = clientSocket.recv(MAX_SIZE).decode()
-                os.makedirs(f'{PATH}\\{dirname}')
+                os.makedirs(f'{self.path}\\{dirname}')
                 message = f'{dirname} created Successfully.'
                 clientSocket.send(message.encode())
                 return self.fileOps(clientSocket)
@@ -131,7 +151,7 @@ class FileOperation(Server):
     def deleteD(self, clientSocket:socket):
         try:
                 dirname = clientSocket.recv(MAX_SIZE).decode()
-                os.rmdir(f'{PATH}\\{dirname}')
+                os.rmdir(f'{self.path}\\{dirname}')
                 message = f'{dirname} created Successfully.'
                 clientSocket.send(message.encode())
                 return self.fileOps(clientSocket)
@@ -140,30 +160,29 @@ class FileOperation(Server):
             clientSocket.send('File Operation Failed'.encode())
     
     def changeD(self, clientSocket:socket):
-        global PATH
         try:
             dirname = clientSocket.recv(MAX_SIZE).decode()
             print(dirname)
             if dirname == 'pwd':
-                message = f'current path > {PATH}'
+                message = f'current path > {self.path}'
                 clientSocket.send(message.encode())
                 return self.fileOps(clientSocket)
             
             elif dirname == '..':
-                if PATH == r'D:\file_server\serverFiles':
+                if self.path == r'C:\Users\abhijit Dey\OneDrive\Desktop\file_server\clientFiles':
                     clientSocket.send('can\'t revert anymore.'.encode())
                     return self.fileOps(clientSocket)
                 else:
                     os.chdir('..')
-                    PATH = os.getcwd()
-                    message = f'{PATH} changed Successfully.'
+                    self.path = os.getcwd()
+                    message = f'{self.path} changed Successfully.'
                     clientSocket.send(message.encode())
                     return self.fileOps(clientSocket)
                 
             else:
-                os.chdir(f'{PATH}\\{dirname}')
-                PATH = os.getcwd()
-                message = f'{PATH} changed Successfully.'
+                os.chdir(f'{self.path}\\{dirname}')
+                self.path = os.getcwd()
+                message = f'{self.path} changed Successfully.'
                 clientSocket.send(message.encode())
                 return self.fileOps(clientSocket)
             
@@ -174,7 +193,7 @@ class FileOperation(Server):
     def getFile(self, clientSocket:socket):
         try:
             filename = clientSocket.recv(MAX_SIZE).decode()
-            file =  open(f'{PATH}\\{filename}.txt', 'r')
+            file =  open(f'{self.path}\\{filename}.txt', 'r')
             readfile = file.read()
 
             clientSocket.sendall(readfile.encode())
@@ -190,7 +209,7 @@ class FileOperation(Server):
         try:
             filename = clientSocket.recv(MAX_SIZE).decode()
             fileContent = clientSocket.recv(MAX_SIZE).decode()
-            saveFile = open(f'{PATH}\\{filename}.txt', 'w')
+            saveFile = open(f'{self.path}\\{filename}.txt', 'w')
             saveFile.write(fileContent)
             saveFile.close()
             return self.fileOps(clientSocket)
